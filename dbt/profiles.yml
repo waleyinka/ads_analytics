@@ -1,0 +1,55 @@
+ads_analytics:      # must match `profile:` in dbt_project.yml
+  target: dev       # used when you don't pass --target
+
+  outputs:
+
+    # Local Development Environment: runs using developer personal access token.
+    dev:
+      type: databricks
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      catalog: "{{ env_var('DBT_DEV_CATALOG', 'marketing_data') }}"
+      schema: "{{ env_var('DBT_DEV_SCHEMA', 'dbt_omowale') }}"
+      threads: 4   # Number of parallel threads
+    
+
+    # CI: GitHub Actions on every pull request.
+    # The workflow sets DBT_CI_SCHEMA (e.g. ci_pr_42), so each PR builds in
+    # its own schema, which is dropped afterwards.
+    ci:
+      type: databricks
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      catalog: "{{ env_var('DBT_CI_CATALOG', 'marketing_data') }}"
+      schema: "{{ env_var('DBT_CI_SCHEMA') }}"
+      threads: 4   # Number of parallel threads
+        
+
+    # Production Environment: runs as the service principal via OAuth machine-to-machine.
+    prod: # Production environment
+      type: databricks
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      auth_type: oauth
+      client_id: "{{ env_var('DATABRICKS_CLIENT_ID') }}"
+      client_secret: "{{ env_var('DATABRICKS_CLIENT_SECRET') }}"
+      catalog: "{{ env_var('DBT_PROD_CATALOG') }}"
+      schema: "{{ env_var('DBT_PROD_SCHEMA', 'analytics') }}"
+      threads: 8
+
+    
+# Profile used by the edr CLI (Elementary reports), not by dbt models.
+# It points at the schema where Elementary stores its run and test results.
+elementary:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      catalog: "{{ env_var('DBT_DEV_CATALOG', 'marketing_data') }}"
+      schema: "{{ env_var('DBT_DEV_SCHEMA', 'dbt_omowale') }}_elementary"
+      threads: 4

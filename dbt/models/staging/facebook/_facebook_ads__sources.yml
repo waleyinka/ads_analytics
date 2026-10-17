@@ -1,0 +1,177 @@
+# Path: dbt/models/staging/facebook/_facebook_ads__sources.yml
+#
+# Raw Facebook Ads tables in marketing_data.ads_raw.
+#   name        = what models use: {{ source('facebook_ads', 'ad_stats') }}
+#   identifier  = the physical table name in Databricks
+
+sources:
+
+  - name: facebook_ads
+    database: marketing_data
+    schema: ads_raw
+    description: >
+      Raw Facebook Ads export, loaded once into the raw layer. Four entity
+      snapshots (accounts, campaigns, ad groups, ads) plus daily ad-level
+      performance. Covers 2025-01-01 to 2025-12-31 (all 365 days present).
+      Spend is in each account's own currency, USD or EUR. No freshness
+      check: this is a one-off historical export.
+    
+    config:
+      meta:
+        owner: "@waleyinka"
+
+    tables:
+
+      - name: accounts
+        identifier: facebook_ads_accounts
+        description: >
+          One row per Facebook ad account (16 rows). Top of the Facebook
+          hierarchy: account > campaign > ad group > ad. The only place the
+          spend currency is recorded.
+        columns:
+          - name: account_id
+            description: Facebook ad account ID (numeric, stored as string). Primary key.
+            data_tests: [unique, not_null]
+          - name: account_name
+            description: Account name as set in Facebook Business Manager, e.g. "Vantora Web - DACH 89".
+          - name: ad_currency_code
+            description: >
+              ISO 4217 currency of all spend under this account. USD or EUR
+              in this data. Of the 3 accounts with stats, 2 report in USD.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['USD', 'EUR']
+          - name: account_created_at
+            description: UTC timestamp when the account was created in Facebook.
+          - name: account_updated_at
+            description: UTC extract timestamp (all rows around 2026-07-30). Not a business change date.
+
+      - name: campaigns
+        identifier: facebook_ads_campaigns
+        description: >
+          One row per Facebook campaign, as of the last extraction. A campaign
+          is the top-level grouping in the Facebook Ads hierarchy
+          (account > campaign > ad group > ad).
+        columns:
+          - name: campaign_id
+            description: Facebook campaign ID (numeric, stored as string). Primary key.
+            data_tests: [unique, not_null]
+          - name: campaign_name
+            description: >
+              Campaign name as set in Ads Manager, e.g.
+              nld_ios_display_tik_retargeting_20260201_onboarding-flow-v2_installs.
+          - name: campaign_updated_at
+            description: UTC timestamp of the campaign record's last update in Facebook.
+
+      - name: ad_groups
+        identifier: facebook_ads_ad_groups
+        description: >
+          One row per Facebook ad group, also called an ad set (13,433 rows).
+          Sits between campaign and ad; controls targeting, budget and schedule.
+        columns:
+          - name: ad_group_id
+            description: Facebook ad group ID (numeric, stored as string). Primary key.
+            data_tests: [unique, not_null]
+          - name: ad_group_name
+            description: Ad group name, e.g. gbr_lal-3pct_55plus_reels_lead_as629.
+          - name: ad_group_updated_at
+            description: UTC timestamp of the ad group record's last update in Facebook.
+
+      - name: ads
+        identifier: facebook_ads_ads
+        description: >
+          One row per Facebook ad (98,926 rows); each ad appears once. Links
+          every ad to its ad group, campaign and account. Only 2,820 ads have
+          stats.
+        columns:
+          - name: ad_id
+            description: Facebook ad ID (numeric, 13 to 18 digits, stored as string). Primary key.
+            data_tests: [unique, not_null]
+          - name: campaign_id
+            description: Campaign this ad belongs to.
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('facebook_ads', 'campaigns')
+                    field: campaign_id
+          - name: ad_group_id
+            description: Ad group this ad belongs to.
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('facebook_ads', 'ad_groups')
+                    field: ad_group_id
+          - name: account_id
+            description: Account this ad belongs to.
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('facebook_ads', 'accounts')
+                    field: account_id
+          - name: ad_name
+            description: Ad name, e.g. studio-a_reel_price-test_problem_en_4x5_c48_v2.
+          - name: ad_status
+            description: Current lifecycle status of the ad as reported by Facebook.
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ['ACTIVE', 'PAUSED', 'ARCHIVED', 'DELETED']
+          - name: ad_updated_at
+            description: UTC timestamp of the ad record's last update in Facebook.
+
+      - name: ad_stats
+        identifier: facebook_ads_ad_stats
+        description: >
+          Daily ad performance. Grain: one row per ad_id and ad_date
+          (92,300 rows, no duplicates). There is no campaign column; join to
+          ads to get one, and to accounts to get the spend currency.
+        config:
+          event_time: ad_date
+        data_tests:
+          - dbt_utils.unique_combination_of_columns:
+              arguments:
+                combination_of_columns: ['ad_id', 'ad_date']
+        columns:
+          - name: ad_id
+            description: The ad these numbers belong to.
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('facebook_ads', 'ads')
+                    field: ad_id
+          - name: account_id
+            description: >
+              Account the ad belongs to. Matches ads.account_id on every row.
+              Joins to accounts for the spend currency.
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('facebook_ads', 'accounts')
+                    field: account_id
+          - name: ad_spend
+            description: >
+              Spend on that day in the account's currency (USD or EUR, see
+              accounts.ad_currency_code). At most 2 decimal places. Never
+              missing; 0 on 7,145 rows.
+            data_tests: [not_null]
+          - name: ad_impressions
+            description: >
+              Times the ad was shown that day. Contains the literal text
+              'null' in 1,474 rows; those rows also have zero spend and no
+              clicks, and staging drops them. Range tests live in staging,
+              after the column is cast to a number.
+          - name: ad_clicks
+            description: >
+              Clicks that day. Contains the literal text 'null' in 24,337 rows
+              (26%). Facebook leaves out zero-valued metrics, so staging
+              treats these as 0.
+          - name: ad_date
+            description: Reporting date, in the ad account's time zone (assumed, not stated by the source).
+            data_tests: [not_null]

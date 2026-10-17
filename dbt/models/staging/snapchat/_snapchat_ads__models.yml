@@ -1,0 +1,126 @@
+# Path: dbt/models/staging/snapchat/_snapchat_ads__models.yml
+
+models:
+
+  - name: stg_snapchat_ads__campaigns
+    description: Snapchat campaigns, cleaned and typed. One row per campaign.
+    columns:
+      - name: campaign_id
+        description: Snapchat campaign ID (UUID). Primary key.
+        data_tests: [unique, not_null]
+      - name: account_id
+        description: Snapchat ad account that owns the campaign.
+        data_tests: [not_null]
+      - name: campaign_name
+        description: Campaign name as set in Snapchat Ads Manager.
+
+  - name: stg_snapchat_ads__ad_groups
+    description: >
+      Snapchat ad groups, deduplicated to the latest version per ad_group_id
+      (raw holds 267 rows for 264 ad groups). One row per ad group.
+    columns:
+      - name: ad_group_id
+        description: Snapchat ad group ID (UUID). Primary key after deduplication.
+        # This test proves the deduplication worked; it would fail on raw.
+        data_tests: [unique, not_null]
+      - name: campaign_id
+        description: Campaign this ad group belongs to.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_snapchat_ads__campaigns')
+                field: campaign_id
+      - name: ad_group_updated_at
+        description: UTC timestamp of the version kept.
+
+  - name: stg_snapchat_ads__ads
+    description: Snapchat ads, cleaned and typed. One row per ad.
+    columns:
+      - name: ad_id
+        description: Snapchat ad ID (UUID). Primary key.
+        data_tests: [unique, not_null]
+      - name: ad_group_id
+        description: >
+          Ad group this ad belongs to. 85 referenced ad groups are missing
+          from the source; none of those ads have stats, so spend is unaffected.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_snapchat_ads__ad_groups')
+                field: ad_group_id
+              # Known source gap: warn, don't block the build.
+              config:
+                severity: warn
+
+  - name: stg_snapchat_ads__ad_stats
+    description: >
+      Daily Snapchat ad performance by country. Grain: one row per ad_id,
+      ad_date and country_code. All spend in EUR. Summed to ad × day in
+      intermediate.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['ad_id', 'ad_date', 'country_code']
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "clicks <= impressions"
+          config:
+            severity: warn
+    columns:
+      - name: platform
+        description: Always 'snapchat'.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['snapchat']
+      - name: ad_id
+        description: The ad these numbers belong to.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_snapchat_ads__ads')
+                field: ad_id
+      - name: ad_date
+        description: Reporting date.
+        data_tests: [not_null]
+      - name: country_code
+        description: Lowercase ISO 3166-1 alpha-2 country code.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['de', 'ch', 'at', 'us']
+              config:
+                severity: warn
+      - name: currency_code
+        description: Currency of spend. Always EUR for Snapchat.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['EUR']
+      - name: spend
+        description: Spend that day in that country, in EUR (currency units, not micro).
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: impressions
+        description: Times the ad was shown that day in that country.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: clicks
+        description: Clicks that day in that country. Missing values set to 0.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: is_clicks_reported
+        description: False in the 111 rows where the source sent no click value.

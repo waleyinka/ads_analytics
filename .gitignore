@@ -3,3 +3,6 @@ logs/
 target/
 dbt_packages/
 .venv/
+edr_target/
+dbt/.user.yml
+docs/

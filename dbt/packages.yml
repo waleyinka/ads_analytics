@@ -1,0 +1,13 @@
+packages:
+
+  - package: dbt-labs/dbt_utils
+    version: [">=1.0.0", "<2.0.0"]
+    # https://hub.getdbt.com/dbt-labs/dbt_utils/latest/
+
+  - package: elementary-data/elementary
+    version: [">=0.26.0", "<0.27.0"]
+    # https://hub.getdbt.com/elementary-data/elementary/latest/
+
+  - package: metaplane/dbt_expectations
+    version: 0.10.10
+    # https://hub.getdbt.com/metaplane/dbt_expectations/latest/

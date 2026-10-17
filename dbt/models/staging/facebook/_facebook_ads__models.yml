@@ -1,0 +1,105 @@
+# Path: dbt/models/staging/facebook/_facebook_ads__models.yml
+
+models:
+
+  - name: stg_facebook_ads__accounts
+    description: Facebook ad accounts, cleaned and typed. One row per account.
+    columns:
+      - name: account_id
+        description: Facebook ad account ID. Primary key.
+        data_tests: [unique, not_null]
+      - name: ad_currency_code
+        description: Currency of all spend under this account (USD or EUR).
+        data_tests: [not_null]
+
+  - name: stg_facebook_ads__campaigns
+    description: Facebook campaigns, cleaned and typed. One row per campaign.
+    columns:
+      - name: campaign_id
+        description: Facebook campaign ID. Primary key.
+        data_tests: [unique, not_null]
+
+  - name: stg_facebook_ads__ad_groups
+    description: Facebook ad groups (ad sets), cleaned and typed. One row per ad group.
+    columns:
+      - name: ad_group_id
+        description: Facebook ad group ID. Primary key.
+        data_tests: [unique, not_null]
+
+  - name: stg_facebook_ads__ads
+    description: Facebook ads, cleaned and typed. One row per ad.
+    columns:
+      - name: ad_id
+        description: Facebook ad ID. Primary key.
+        data_tests: [unique, not_null]
+
+  - name: stg_facebook_ads__ad_stats
+    description: >
+      Daily Facebook ad performance, cleaned. Grain: one row per ad_id and
+      ad_date. Text 'null' values are converted, missing clicks are set to 0,
+      and rows with no spend, impressions or clicks are removed.
+
+    # Tests that check the whole row go here, at model level.
+    data_tests:
+
+      # Grain check: no ad appears twice on the same day.
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['ad_id', 'ad_date']
+
+      # Sanity check: an ad can't get more clicks than times it was shown.
+      # 'warn' because platforms can disagree slightly; it shouldn't block a deploy.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "clicks <= impressions"
+          config:
+            severity: warn
+
+    # Tests that check a single column go under that column.
+    columns:
+      - name: platform
+        description: Always 'facebook'. Used when platforms are combined.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['facebook']
+
+      - name: ad_id
+        description: The ad these numbers belong to.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_facebook_ads__ads')
+                field: ad_id
+
+      - name: ad_date
+        description: Reporting date.
+        data_tests: [not_null]
+
+      - name: spend
+        description: Spend that day in the account's currency (see accounts).
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+
+      - name: impressions
+        description: Times the ad was shown that day.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+
+      - name: clicks
+        description: Clicks that day. Missing source values are set to 0.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+
+      - name: is_clicks_reported
+        description: False when the source sent no click value and clicks was set to 0.
