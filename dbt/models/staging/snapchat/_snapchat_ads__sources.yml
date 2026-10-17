@@ -1,0 +1,144 @@
+# Path: dbt/models/staging/snapchat/_snapchat_ads__sources.yml
+#
+# Raw Snapchat Ads tables in marketing_data.ads_raw.
+#   name        = what models use: {{ source('snapchat_ads', 'ad_stats') }}
+#   identifier  = the physical table name in Databricks
+
+
+sources:
+
+  - name: snapchat_ads
+    database: marketing_data
+    schema: ads_raw
+    description: >
+      Raw Snapchat Ads export, loaded once into the raw layer. Three entity
+      snapshots (campaigns, ad groups, ads) plus daily ad performance broken
+      down by country. Covers 2024-01-01 to 2024-12-02 (133 distinct days).
+      All spend is in EUR. There is no account table for Snapchat. No
+      freshness check because the source is a one-time export.
+    config:
+      meta:
+        owner: "@waleyinka"
+
+    tables:
+
+      - name: campaigns
+        identifier: snapchat_ads_campaigns
+        description: >
+          One row per Snapchat campaign (109 rows). Top of the Snapchat
+          hierarchy available here: campaign > ad group > ad.
+        columns:
+          - name: campaign_id
+            description: Snapchat campaign ID (UUID string). Primary key.
+            data_tests: [unique, not_null]
+          - name: account_id
+            description: >
+              Snapchat ad account ID (UUID string) that owns the campaign.
+              Two accounts appear in this data.
+          - name: campaign_name
+            description: >
+              Campaign name as set in Snapchat Ads Manager, e.g.
+              CMP_2024_DEU_CONVERSIONS_Traffic_Broad_SpringPromo_C26.
+
+      - name: ad_groups
+        identifier: snapchat_ads_ad_groups
+        description: >
+          Ad group history: 267 rows for 264 ad groups. Three ad groups have
+          two versions with the same name. Staging keeps the latest version
+          per ad_group_id, by ad_group_updated_at.
+        columns:
+          - name: _surrogate_key
+            description: Hash key unique per row (per version). Primary key of this raw table.
+            data_tests: [unique, not_null]
+          - name: ad_group_id
+            description: >
+              Snapchat ad group ID (UUID string). Not unique in raw because of
+              history versions; unique only after staging deduplication.
+            data_tests: [not_null]
+          - name: campaign_id
+            description: Campaign this ad group belongs to. Foreign key to campaigns.campaign_id.
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('snapchat_ads', 'campaigns')
+                    field: campaign_id
+          - name: ad_group_name
+            description: Ad group name, e.g. iOS_DACH_2024_Purchases_Prospecting_18-34_AG06.
+          - name: ad_group_updated_at
+            description: UTC timestamp of this version's last update. Used to pick the latest version.
+
+      - name: ads
+        identifier: snapchat_ads_ads
+        description: >
+          One row per Snapchat ad (2,513 rows). Links each ad to its ad group.
+        columns:
+          - name: ad_id
+            description: Snapchat ad ID (UUID string). Primary key. Matches ad_stats.ad_detail_id.
+            data_tests: [unique, not_null]
+          - name: ad_group_id
+            description: >
+              Ad group this ad belongs to. 85 ad group IDs referenced here are
+              missing from ad_groups. None of those ads have any stats, so no
+              spend is affected, which is why the relationship test only warns.
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('snapchat_ads', 'ad_groups')
+                    field: ad_group_id
+                  config:
+                    severity: warn
+          - name: ad_name
+            description: Ad name, e.g. FRA_Video_Promo2024_Static_v3.
+          - name: ad_detail_updated_at
+            description: UTC extract timestamp (all rows 2026-10-05). Not a business change date.
+
+      - name: ad_stats
+        identifier: snapchat_ads_ad_stats
+        description: >
+          Daily ad performance by country. Grain: one row per ad_detail_id,
+          ad_date and ad_country (2,809 rows). Sum across countries to get
+          ad-day totals.
+        config:
+          event_time: ad_date
+        data_tests:
+          - dbt_utils.unique_combination_of_columns:
+              arguments:
+                combination_of_columns: ['ad_detail_id', 'ad_date', 'ad_country']
+        columns:
+          - name: ad_detail_id
+            description: The ad these numbers belong to. Foreign key to ads.ad_id.
+            data_tests:
+              - not_null
+              - relationships:
+                  arguments:
+                    to: source('snapchat_ads', 'ads')
+                    field: ad_id
+          - name: ad_currency_code
+            description: ISO 4217 currency of ad_spend. Always EUR in this data.
+            data_tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['EUR']
+          - name: ad_country
+            description: Lowercase ISO 3166-1 alpha-2 country code (de, ch, at, us).
+            data_tests: [not_null]
+          - name: ad_spend
+            description: >
+              Spend on that day and country, in currency units (not
+              micro-currency), with up to 6 decimal places. Never missing.
+            data_tests: [not_null]
+          - name: ad_impressions
+            description: Times the ad was shown that day in that country. Never missing or zero.
+          - name: ad_clicks
+            description: >
+              Clicks that day in that country. Contains the literal text
+              'null' in 111 rows; staging converts it to SQL NULL. Range
+              tests live in staging, after the column is cast to a number.
+          - name: ad_date
+            description: Reporting date, in the ad account's time zone (assumed, not stated by the source).
+            data_tests: [not_null]
+          - name: data_src
+            description: Constant 'snapchat_ads'. Lineage tag from the extract, not needed downstream.
