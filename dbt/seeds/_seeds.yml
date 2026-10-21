@@ -1,0 +1,55 @@
+# dbt/seeds/_seeds.yml
+
+seeds:
+
+  - name: fx_rates
+    description: >
+      Daily euro foreign exchange reference rates published by the European
+      Central Bank (ECB), USD series, 2024-01-02 to 2025-12-31 (511 rows).
+      Working days only: the ECB publishes no rate on weekends or TARGET
+      holidays (e.g. 1 January), so gaps are filled downstream in
+      int_fx_rates__daily.
+      Source: ECB euro foreign exchange reference rates, historical file
+      (eurofxref-hist), as bundled in the currencyconverter Python package
+      v0.18.22. Equivalent to ECB Data Portal series EXR.D.USD.EUR.SP00.A.
+      Used to convert Facebook USD spend to EUR, so spend can be compared
+      across platforms.
+    config:
+      column_types:
+        rate_date: date
+        currency_code: string
+        units_per_eur: decimal(18, 6)
+
+    data_tests:
+      # Grain: one rate per currency per published day.
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['currency_code', 'rate_date']
+
+    columns:
+      - name: rate_date
+        description: ECB publication date (working days only).
+        data_tests: [not_null]
+
+      - name: currency_code
+        description: >
+          ISO 4217 code of the foreign currency. Only USD is needed: EUR
+          spend needs no conversion (rate 1.0 is added in int_fx_rates__daily).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['USD']
+
+      - name: units_per_eur
+        description: >
+          Units of the currency equal to 1 EUR (e.g. 1.0956 means
+          1 EUR = 1.0956 USD). To convert to EUR, DIVIDE the amount by this
+          rate: spend_eur = spend / units_per_eur.
+        data_tests:
+          - not_null
+          # A rate must be positive; zero would cause division by zero.
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false

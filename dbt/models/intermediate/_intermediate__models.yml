@@ -1,0 +1,64 @@
+# Path: models/intermediate/_intermediate__models.yml
+
+models:
+
+  - name: int_facebook_ads__ad_stats_enriched
+    description: >
+      Facebook daily ad stats with campaign, ad group and currency. Grain: ad × day.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['ad_id', 'ad_date']
+    columns:
+      - name: campaign_id
+        data_tests: [not_null]        # proves every stats row found its ad
+      - name: currency_code
+        data_tests: [not_null]        # proves every stats row found its account
+
+  - name: int_snapchat_ads__ad_stats_enriched
+    description: >
+      Snapchat daily ad stats (countries summed) with ad group and campaign. Grain: ad × day.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['ad_id', 'ad_date']
+    columns:
+      - name: ad_group_id
+        data_tests: [not_null]
+      - name: campaign_id
+        data_tests: [not_null]
+
+  - name: int_fx_rates__daily
+    description: >
+      Daily FX rates to EUR, gaps forward-filled. Grain: currency × day.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['currency_code', 'rate_date']
+    columns:
+      - name: units_per_eur
+        data_tests: [not_null]        # proves no day was left without a rate
+
+  - name: int_ads__ad_stats_unioned
+    description: >
+      Both platforms' daily ad stats with spend converted to EUR. Grain: platform × ad × day.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['platform', 'ad_id', 'ad_date']
+    columns:
+      - name: platform
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['facebook', 'snapchat']
+      - name: spend_eur
+        data_tests: [not_null]        # proves every row found an FX rate
+
+  - name: int_ads__campaigns_unioned
+    description: >
+      Campaigns from both platforms. Grain: platform × campaign.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['platform', 'campaign_id']
