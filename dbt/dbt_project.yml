@@ -26,9 +26,9 @@ clean-targets:         # directories to be removed by `dbt clean`
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
 
-# In this example config, we tell dbt to build all models in the example/
-# directory as views. These settings can be overridden in the individual model
-# files using the `{{ config(...) }}` macro.
+# Schema names below are the custom part. 
+# In dev, dbt prefixes target schema (e.g. dbt_omowale_staging). 
+# In Prod schema names are generated with generate_schema_name.
 models:
     # Config indicated by + and applies to all files under models/example/
   ads_analytics:
@@ -44,4 +44,14 @@ models:
 
   elementary:
      +schema: elementary
-     
+
+
+seeds:
+  ads_analytics:
+    +schema: seeds
+
+
+vars:
+  # Date range covered by int_fx_rates__daily. End date is exclusive.
+  fx_start_date: '2024-01-01'
+  fx_end_date: '2026-01-01'   # exclusive, so 2025-12-31 is included
