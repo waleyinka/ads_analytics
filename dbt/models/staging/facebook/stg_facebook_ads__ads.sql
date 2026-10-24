@@ -1,25 +1,25 @@
 -- Path: /dbt/models/staging/facebook/stg_facebook_ads__ads.sql
 -- Grain: one row per ad_id
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT * FROM {{ source('facebook_ads', 'ads') }}
+    select * from {{ source('facebook_ads', 'ads') }}
 
 ),
 
-formatted AS (
+formatted as (
     -- Formatting columns
-    SELECT
-        CAST(ad_id AS STRING)                   AS ad_id,
-        CAST(campaign_id AS STRING)             AS campaign_id,
-        CAST(ad_group_id AS STRING)             AS ad_group_id,
-        CAST(account_id AS STRING)              AS account_id,
-        CAST(ad_name AS STRING)                 AS ad_name,
-        
-        CAST(ad_status AS STRING)               AS ad_status,
-        
-        CAST(ad_updated_at AS TIMESTAMP)        AS ad_updated_at
-    FROM source_data
+    select
+        cast(ad_id as string)            as ad_id,
+        cast(campaign_id as string)      as campaign_id,
+        cast(ad_group_id as string)      as ad_group_id,
+        cast(account_id as string)       as account_id,
+        cast(ad_name as string)          as ad_name,
+
+        cast(ad_status as string)        as ad_status,
+
+        cast(ad_updated_at as timestamp) as ad_updated_at
+    from source_data
 )
 
-SELECT * FROM formatted
+select * from formatted

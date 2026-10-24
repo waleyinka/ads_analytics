@@ -6,31 +6,31 @@
 -- into that model as a CTE 
 {{ config(materialized='ephemeral') }}
 
-WITH stats AS (
-    SELECT *
-    FROM {{ ref('stg_snapchat_ads__ad_stats') }}
+with stats as (
+    select *
+    from {{ ref('stg_snapchat_ads__ad_stats') }}
 ),
 
-aggregated AS (
-    SELECT
+aggregated as (
+    select
         platform,
         ad_id,
         ad_date,
         currency_code,                               -- always EUR; safe to group by
-        SUM(spend)                                   AS spend,
-        SUM(impressions)                             AS impressions,
-        SUM(clicks)                                  AS clicks,
-        
+        sum(spend)                   as spend,
+        sum(impressions)             as impressions,
+        sum(clicks)                  as clicks,
+
         -- TRUE only if every country reported clicks for this ad-day.
-        BOOL_AND(is_clicks_reported)                 AS is_clicks_reported,
-        
-        COUNT(*)                                     AS country_count
-    FROM stats
-    GROUP BY
+        bool_and(is_clicks_reported) as is_clicks_reported,
+
+        count(*)                     as country_count
+    from stats
+    group by
         platform,
         ad_id,
         ad_date,
         currency_code
 )
 
-SELECT * FROM aggregated
+select * from aggregated

@@ -1,25 +1,25 @@
 -- Path: /dbt/models/staging/facebook/stg_facebook_ads__ad_stats.sql
 -- Grain: one row per ad_id and ad_date.
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT * FROM {{ source('facebook_ads', 'ad_stats') }}
+    select * from {{ source('facebook_ads', 'ad_stats') }}
 
 ),
 
-formatted AS (
+formatted as (
     -- Formatting columns
-    SELECT
-        CAST(ad_id AS STRING)                               AS ad_id,
-        CAST(account_id AS STRING)                          AS account_id,
-        CAST(ad_date AS DATE)                               AS ad_date,
-        
-        CAST(ad_spend AS DECIMAL(18, 6))                    AS spend,
-        
-        CAST(NULLIF(ad_impressions, 'null') AS BIGINT)      AS impressions,
-        
-        CAST(NULLIF(ad_clicks, 'null') AS BIGINT)           AS clicks_raw        
-    FROM source_data
+    select
+        cast(ad_id as string)                          as ad_id,
+        cast(account_id as string)                     as account_id,
+        cast(ad_date as date)                          as ad_date,
+
+        cast(ad_spend as decimal(18, 6))               as spend,
+
+        cast(nullif(ad_impressions, 'null') as bigint) as impressions,
+
+        cast(nullif(ad_clicks, 'null') as bigint)      as clicks_raw
+    from source_data
 ),
 
 /*
@@ -29,21 +29,21 @@ formatted AS (
 */
 
 cleaned (
-    SELECT
-        'facebook'              AS platform,
+    select
+        'facebook'               as platform,
         ad_id,
         account_id,
         ad_date,
         spend,
-        COALESCE(impressions, 0)    AS impressions,
-        COALESCE(clicks_raw, 0)     AS clicks,
-        clicks_raw IS NOT NULL      AS is_clicks_reported
-    FROM formatted
-    WHERE NOT (
+        coalesce(impressions, 0) as impressions,
+        coalesce(clicks_raw, 0)  as clicks,
+        clicks_raw is not null   as is_clicks_reported
+    from formatted
+    where not (
         spend = 0
-        and COALESCE(impressions, 0) = 0
-        and COALESCE(clicks_raw, 0) = 0
+        and coalesce(impressions, 0) = 0
+        and coalesce(clicks_raw, 0) = 0
     )
 )
 
-SELECT * FROM cleaned
+select * from cleaned
