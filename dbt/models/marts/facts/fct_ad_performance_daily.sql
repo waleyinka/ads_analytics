@@ -11,21 +11,21 @@
     )
 }}
 
-WITH source AS (
+with source as (
 
-    SELECT *
-    FROM {{ ref('int_ads__ad_stats_unioned') }}
+    select unioned.*
+    from {{ ref('int_ads__ad_stats_unioned') }} as unioned
 
     {% if is_incremental() %}
-    -- Reprocess the last N days relative to what is already loaded.
-    -- coalesce guards the edge case of an existing but empty table.
-    WHERE ad_date >= (
-        SELECT date_sub (
-            coalesce(max(ad_date), CAST('1900-01-01' AS DATE)),
-            {{ var('lookback_days', 3) }}
+        -- Reprocess the last N days relative to what is already loaded.
+        -- coalesce guards the edge case of an existing but empty table.
+        WHERE ad_date >= (
+            SELECT date_sub (
+                coalesce(max(ad_date), CAST('1900-01-01' AS DATE)),
+                {{ var('lookback_days', 3) }}
+            )
+            FROM {{ this }} AS existing
         )
-        FROM {{ this }}
-    )
     {% endif %}
 
 ),
@@ -33,8 +33,8 @@ WITH source AS (
 final as (
 
     select
-        {{ dbt_utils.generate_surrogate_key(['platform', 'ad_id', 'ad_date']) }}            AS ad_performance_key,
-        {{ dbt_utils.generate_surrogate_key(['platform', 'campaign_id']) }}                 AS campaign_key,
+        {{ dbt_utils.generate_surrogate_key(['platform', 'ad_id', 'ad_date']) }} as ad_performance_key,
+        {{ dbt_utils.generate_surrogate_key(['platform', 'campaign_id']) }}      as campaign_key,
         platform,
         ad_id,
         ad_date,
@@ -46,7 +46,8 @@ final as (
         impressions,
         clicks,
         is_clicks_reported,
-        current_timestamp()                          as _loaded_at   -- when this row was last written
+        -- when this row was last written
+        current_timestamp()                                                      as _loaded_at
     from source
 
 )

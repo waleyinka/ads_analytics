@@ -1,31 +1,31 @@
 -- Path: /dbt/models/staging/snapchat/stg_snapchat_ads__ad_groups.sql
 -- Grain: one row per ad_group_id.
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT * FROM {{ source('snapchat_ads', 'ad_groups') }}
+    select * from {{ source('snapchat_ads', 'ad_groups') }}
 
 ),
 
-formatted AS (
+formatted as (
     -- Formatting columns
-    SELECT
-        
-        CAST(ad_group_id AS STRING)                 AS ad_group_id,
-        CAST(campaign_id AS STRING)                 AS campaign_id,
-        CAST(ad_group_name AS STRING)               AS ad_group_name,
+    select
 
-        CAST(ad_group_updated_at AS TIMESTAMP)     AS ad_group_updated_at
-    FROM source_data
+        cast(ad_group_id as string)            as ad_group_id,
+        cast(campaign_id as string)            as campaign_id,
+        cast(ad_group_name as string)          as ad_group_name,
+
+        cast(ad_group_updated_at as timestamp) as ad_group_updated_at
+    from source_data
 ),
 
-deduped AS (
-    SELECT *
-    FROM formatted
-    QUALIFY row_number() OVER(
-        PARTITION BY ad_group_id
-        ORDER BY ad_group_updated_at DESC
+deduped as (
+    select *
+    from formatted
+    qualify row_number() over (
+        partition by ad_group_id
+        order by ad_group_updated_at desc
     ) = 1
 )
 
-SELECT * FROM deduped
+select * from deduped

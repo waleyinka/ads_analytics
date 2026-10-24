@@ -2,9 +2,9 @@
 -- Grain: one row per currency_code and rate_date (every calendar day).
 
 
-WITH date_spine AS (
+with date_spine as (
 
-    -- dbt_utils.date_spine: end_date is EXCLUSIVE, so 2026-01-01 includes 2025-12-31.
+-- dbt_utils.date_spine: end_date is EXCLUSIVE, so 2026-01-01 includes 2025-12-31.
     {{ dbt_utils.date_spine(
         datepart="day",
         start_date="cast('" ~ var('fx_start_date', '2024-01-01') ~ "' as date)",
@@ -13,82 +13,86 @@ WITH date_spine AS (
 
 ),
 
-seed_rates AS (
+seed_rates as (
 
-    SELECT rate_date, currency_code, units_per_eur
-    FROM {{ ref('fx_rates') }}
+    select
+        rate_date,
+        currency_code,
+        units_per_eur
+    from {{ ref('fx_rates') }}
 
 ),
 
-currencies AS (
+currencies as (
 
-    SELECT
-        DISTINCT currency_code 
-    FROM seed_rates
+    select distinct currency_code
+    from seed_rates
 
 ),
 
 -- Every currency on every day; days without a published rate are NULL for now.
-calendar AS (
+calendar as (
 
-    SELECT
-        CAST(date_spine.date_day AS DATE)            AS rate_date,
+    select
+        cast(date_spine.date_day as date) as rate_date,
         currencies.currency_code
-    FROM date_spine
-    CROSS JOIN currencies
+    from date_spine
+    cross join currencies
 ),
 
-filled AS (
+filled as (
 
-    SELECT
+    select
         calendar.rate_date,
         calendar.currency_code,
         coalesce(
             -- Forward-fill: last published rate up to this day...
-            last_value(seed_rates.units_per_eur, true) OVER (
-                PARTITION BY calendar.currency_code
-                ORDER BY calendar.rate_date
-                ROWS BETWEEN UNBOUNDED PRECEDING AND current ROW
+            last_value(seed_rates.units_per_eur, true) over (
+                partition by calendar.currency_code
+                order by calendar.rate_date
+                rows between unbounded preceding and current row
             ),
             -- ...or, for the first days of the range (e.g. 1 Jan, an ECB
             -- holiday), the next published rate.
-            first_value(seed_rates.units_per_eur, true) OVER (
-                PARTITION BY calendar.currency_code
-                ORDER BY calendar.rate_date
-                ROWS BETWEEN current ROW AND UNBOUNDED FOLLOWING
+            first_value(seed_rates.units_per_eur, true) over (
+                partition by calendar.currency_code
+                order by calendar.rate_date
+                rows between current row and unbounded following
             )
-        )                                            AS units_per_eur,
-        seed_rates.units_per_eur IS NULL             AS is_rate_filled
-    FROM calendar
-    LEFT JOIN seed_rates
-        ON calendar.rate_date = seed_rates.rate_date
-       AND calendar.currency_code = seed_rates.currency_code
+        )                                as units_per_eur,
+        seed_rates.units_per_eur is null as is_rate_filled
+    from calendar
+    left join seed_rates
+        on
+            calendar.rate_date = seed_rates.rate_date
+            and calendar.currency_code = seed_rates.currency_code
 
 ),
 
 -- EUR -> EUR is always 1.0, on every day.
-eur AS (
+eur as (
 
-    SELECT
-        CAST(date_day AS date)                       AS rate_date,
-        'EUR'                                        AS currency_code,
-        CAST(1.0 AS decimal(18, 6))                  AS units_per_eur,
-        false                                        AS is_rate_filled
-    FROM date_spine
+    select
+        cast(date_day as date)      as rate_date,
+        'EUR'                       as currency_code,
+        cast(1.0 as decimal(18, 6)) as units_per_eur,
+        false                       as is_rate_filled
+    from date_spine
 
 )
 
-SELECT
-    rate_date, currency_code,
-    CAST(units_per_eur AS decimal(18, 6)) AS units_per_eur,
+select
+    rate_date,
+    currency_code,
+    cast(units_per_eur as decimal(18, 6)) as units_per_eur,
     is_rate_filled
-FROM filled
+from filled
 
-UNION ALL
+union all
 
-SELECT
+select
     rate_date,
     currency_code,
     units_per_eur,
     is_rate_filled
-FROM eur
+from eur

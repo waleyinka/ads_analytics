@@ -1,0 +1,79 @@
+# Merge to main: prod build, publish docs and report
+
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:          # also allows a manual run from the Actions tab
+
+# Never run two production deploys at once; queue them instead.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+
+  deploy:
+    name: dbt build (prod)
+    runs-on: ubuntu-latest
+    # Releases the SP secrets, and only on main (environment rule).
+    environment: production
+    env:
+      DBT_PROJECT_DIR: dbt
+      DBT_PROFILES_DIR: dbt
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
+      # Service principal, OAuth M2M. Note: NO DATABRICKS_TOKEN in this job,
+      # so the SDK can't see two auth methods at once.
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+      DBT_PROD_CATALOG: ${{ vars.DBT_PROD_CATALOG }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run dbt deps
+      - name: Check connection as the service principal
+        run: uv run dbt debug --target prod
+      - name: Create / update Elementary tables
+        run: uv run dbt run --select elementary --target prod
+      # Unit tests check SQL logic against fake data: they already ran in CI and
+      # add nothing in prod, so they're excluded here.
+      - name: Build and test production
+        run: uv run dbt build --target prod --exclude-resource-type unit_test
+
+      - name: Generate docs
+        if: always()
+        run: uv run dbt docs generate --static --target prod
+      - name: Generate Elementary report
+        if: always()
+        run: >
+          uv run edr report
+          --project-dir dbt --profiles-dir dbt --profile-target prod
+          --days-back 30
+          --file-path site/elementary/index.html
+          --open-browser false
+      - name: Assemble site
+        if: always()
+        run: cp dbt/target/static_index.html site/index.html
+      - name: Upload site for GitHub Pages
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  publish:
+    name: Publish docs + Elementary report
+    needs: deploy
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - id: pages
+        uses: actions/deploy-pages@v4
