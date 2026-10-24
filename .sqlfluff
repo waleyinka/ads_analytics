@@ -1,0 +1,34 @@
+[sqlfluff]
+templater = dbt
+dialect = databricks
+max_line_length = 120
+# LT05: line length is handled above; ST06: column order is a style choice.
+exclude_rules = ST06
+
+[sqlfluff:templater:dbt]
+project_dir = dbt
+profiles_dir = dbt
+profile = ads_analytics
+target = ci
+
+[sqlfluff:rules:capitalisation.keywords]
+# Your models mix SELECT and select; "consistent" accepts either, per file.
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = lower
+
+
+[sqlfluff:layout:type:alias_expression]
+spacing_before = align
+align_within = select_clause
+align_scope = bracketed
