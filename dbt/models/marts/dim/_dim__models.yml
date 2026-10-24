@@ -1,0 +1,68 @@
+models:
+
+  - name: dim_campaign
+    description: >
+      One row per platform and campaign, for both Facebook and Snapchat.
+      Includes campaigns that never spent; filter on has_spend = true for
+      campaigns that appear in the performance data.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['platform', 'campaign_id']
+    columns:
+      - name: campaign_key
+        description: Surrogate primary key (hash of platform + campaign_id). Join facts on this.
+        data_tests: [unique, not_null]
+      - name: platform
+        description: Advertising platform, lowercase.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['facebook', 'snapchat']
+      - name: campaign_id
+        description: Platform's campaign ID. Unique only within a platform.
+        data_tests: [not_null]
+      - name: campaign_name
+        description: Campaign name as set in the platform's Ads Manager.
+      - name: account_id
+        description: Ad account that owns the campaign.
+      - name: account_name
+        description: Ad account name. Available for Facebook only; NULL for Snapchat.
+      - name: first_spend_date
+        description: First date with spend > 0. NULL if the campaign never spent.
+      - name: last_spend_date
+        description: Last date with spend > 0. NULL if the campaign never spent.
+      - name: has_spend
+        description: True if the campaign has any spend in fct_ad_performance_daily.
+        data_tests: [not_null]
+
+  - name: dim_date
+    description: >
+      One row per calendar day, 2024-01-01 to 2025-12-31. Use it to group
+      performance by week, month or quarter, and to answer relative-date
+      questions consistently.
+    data_tests:
+      # dbt_expectations: the spine must contain every day, no gaps.
+      - dbt_expectations.expect_table_row_count_to_equal:
+          arguments:
+            value: 731
+    columns:
+      - name: date_day
+        description: Calendar date. Primary key.
+        data_tests: [unique, not_null]
+      - name: year
+        description: Calendar year.
+      - name: quarter
+        description: Calendar quarter (1 to 4).
+      - name: month
+        description: Month number (1 to 12).
+      - name: month_name
+        description: Full month name, e.g. January.
+      - name: month_start
+        description: First day of the month. Use to group by month.
+      - name: week_start
+        description: Monday of the week. Use to group by week.
+      - name: is_weekend
+        description: True on Saturday and Sunday.
+        data_tests: [not_null]

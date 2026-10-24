@@ -60,14 +60,20 @@ models:
       ad_date and country_code. All spend in EUR. Summed to ad × day in
       intermediate.
     data_tests:
+
+      # Grain check
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: ['ad_id', 'ad_date', 'country_code']
+      
+      # Sanity check: an ad can't get more clicks than times it was shown.
+      # 'warn' because platforms can disagree slightly; it shouldn't block a deploy.
       - dbt_utils.expression_is_true:
           arguments:
             expression: "clicks <= impressions"
           config:
             severity: warn
+      
     columns:
       - name: platform
         description: Always 'snapchat'.
