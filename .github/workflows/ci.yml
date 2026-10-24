@@ -1,0 +1,65 @@
+# Pull request: lint, build, test, docs artifact
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+# A new push to the same PR cancels the previous, now outdated, run.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  DBT_PROJECT_DIR: dbt
+  DBT_PROFILES_DIR: dbt
+  DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+  DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
+  DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+  DBT_CI_CATALOG: marketing_data
+  
+  # Every PR builds in its own schemas: ci_pr_42_staging, ci_pr_42_marts, ...
+  DBT_CI_SCHEMA: ci_pr_${{ github.event.pull_request.number }}
+
+jobs:
+
+  lint:
+    name: SQL lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies (exact versions from uv.lock)
+        run: uv sync --frozen
+      - name: Install dbt packages
+        run: uv run dbt deps
+      - name: Lint models
+        run: uv run sqlfluff lint dbt/models
+
+  build:
+    name: dbt build (CI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies (exact versions from uv.lock)
+        run: uv sync --frozen
+      - name: Install dbt packages
+        run: uv run dbt deps
+      - name: Check connection
+        run: uv run dbt debug --target ci
+      # Elementary's tables must exist before its tests run (see Phase 8).
+      - name: Create Elementary tables
+        run: uv run dbt run --select elementary --target ci
+      - name: Build and test everything
+        run: uv run dbt build --target ci
+      - name: Generate docs
+        if: always()
+        run: uv run dbt docs generate --static --target ci
+      - name: Upload docs for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-docs-pr-${{ github.event.pull_request.number }}
+          path: dbt/target/static_index.html
