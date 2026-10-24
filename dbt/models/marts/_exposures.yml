@@ -1,0 +1,29 @@
+exposures:
+
+  - name: marketing_performance_dashboard
+    label: Marketing performance dashboard
+    type: dashboard
+    maturity: low
+    description: >
+      Planned BI dashboard for the Marketing team: spend, clicks and
+      CTR/CPC/CPM by platform and campaign over time. Replaces manual
+      exports from each ad platform.
+    depends_on:
+      - ref('marketing_performance_daily')
+      - ref('dim_date')
+    owner:
+      name: Omowale
+
+  - name: marketing_ai_agent
+    label: Marketing AI analytics agent
+    type: application
+    maturity: low
+    description: >
+      Natural-language questions from non-technical users ("How much did we
+      spend on Facebook last month?"). Reads table and column comments
+      persisted to Unity Catalog.
+    depends_on:
+      - ref('marketing_performance_daily')
+      - ref('dim_campaign')
+    owner:
+      name: Omowale

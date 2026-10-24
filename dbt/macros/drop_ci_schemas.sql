@@ -1,0 +1,1 @@
+-- Safely deletes a pull request’s CI schemas

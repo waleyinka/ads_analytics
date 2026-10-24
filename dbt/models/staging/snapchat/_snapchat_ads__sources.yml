@@ -27,6 +27,14 @@ sources:
         description: >
           One row per Snapchat campaign (109 rows). Top of the Snapchat
           hierarchy available here: campaign > ad group > ad.
+        
+        data_tests:
+          # Warns if the raw export adds, drops or retypes a column.
+          # Placed on the source because staging casts would hide type changes.
+          - elementary.schema_changes:
+              config:
+                severity: warn
+
         columns:
           - name: campaign_id
             description: Snapchat campaign ID (UUID string). Primary key.
@@ -46,6 +54,14 @@ sources:
           Ad group history: 267 rows for 264 ad groups. Three ad groups have
           two versions with the same name. Staging keeps the latest version
           per ad_group_id, by ad_group_updated_at.
+        
+        data_tests:
+          # Warns if the raw export adds, drops or retypes a column.
+          # Placed on the source because staging casts would hide type changes.
+          - elementary.schema_changes:
+              config:
+                severity: warn
+
         columns:
           - name: _surrogate_key
             description: Hash key unique per row (per version). Primary key of this raw table.
@@ -72,6 +88,14 @@ sources:
         identifier: snapchat_ads_ads
         description: >
           One row per Snapchat ad (2,513 rows). Links each ad to its ad group.
+        
+        data_tests:
+          # Warns if the raw export adds, drops or retypes a column.
+          # Placed on the source because staging casts would hide type changes.
+          - elementary.schema_changes:
+              config:
+                severity: warn
+
         columns:
           - name: ad_id
             description: Snapchat ad ID (UUID string). Primary key. Matches ad_stats.ad_detail_id.
@@ -102,10 +126,18 @@ sources:
           ad-day totals.
         config:
           event_time: ad_date
+        
         data_tests:
           - dbt_utils.unique_combination_of_columns:
               arguments:
                 combination_of_columns: ['ad_detail_id', 'ad_date', 'ad_country']
+
+          # Warns if the raw export adds, drops or retypes a column.
+          # Placed on the source because staging casts would hide type changes.
+          - elementary.schema_changes:
+              config:
+                severity: warn
+        
         columns:
           - name: ad_detail_id
             description: The ad these numbers belong to. Foreign key to ads.ad_id.

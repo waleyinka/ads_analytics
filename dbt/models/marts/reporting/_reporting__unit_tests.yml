@@ -1,0 +1,27 @@
+# Path: models/marts/reporting/_reporting__unit_tests.yml
+
+unit_tests:
+
+  - name: test_ratios_sum_before_divide_and_null_on_zero
+    description: >
+      Campaign k1 has two ads on one day; its CPC must be total spend / total
+      clicks (100 / 20 = 5.0), not an average of per-ad CPCs. Campaign k2 has
+      spend but no impressions or clicks: CTR, CPC and CPM must be NULL.
+    model: marketing_performance_daily          # use your final model name
+    given:
+      - input: ref('fct_ad_performance_daily')
+        rows:
+          - {platform: facebook, campaign_key: k1, campaign_id: c1, ad_id: a1, ad_date: '2025-01-01', currency_code: EUR, spend: 60, spend_eur: 60, impressions: 4000, clicks: 20}
+          - {platform: facebook, campaign_key: k1, campaign_id: c1, ad_id: a2, ad_date: '2025-01-01', currency_code: EUR, spend: 40, spend_eur: 40, impressions: 1000, clicks: 0}
+          - {platform: facebook, campaign_key: k2, campaign_id: c2, ad_id: a3, ad_date: '2025-01-01', currency_code: EUR, spend: 3, spend_eur: 3, impressions: 0, clicks: 0}
+      - input: ref('dim_campaign')
+        rows:
+          - {campaign_key: k1, campaign_name: Campaign One}
+          - {campaign_key: k2, campaign_name: Campaign Two}
+      - input: ref('dim_date')
+        rows:
+          - {date_day: '2025-01-01', week_start: '2024-12-30', month_start: '2025-01-01', year: 2025}
+    expect:
+      rows:
+        - {campaign_key: k1, spend_eur: 100, clicks: 20, impressions: 5000, ctr: 0.004, cpc_eur: 5.0000, cpm_eur: 20.0000}
+        - {campaign_key: k2, spend_eur: 3, clicks: 0, impressions: 0, ctr: null, cpc_eur: null, cpm_eur: null}

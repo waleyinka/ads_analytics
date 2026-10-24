@@ -6,3 +6,5 @@ dbt_packages/
 edr_target/
 dbt/.user.yml
 docs/
+.env.prod
+!.env.example
