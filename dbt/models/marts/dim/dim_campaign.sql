@@ -40,7 +40,7 @@ final as (
         f.account_name,
         ss.first_spend_date,
         ss.last_spend_date,
-        ss.campaign_id is not null                                                  as has_spend
+        ss.campaign_id is not null                                              as has_spend
     from campaigns as c
     left join facebook_accounts as f
         on

@@ -29,3 +29,8 @@ extended_capitalisation_policy = lower
 spacing_before = align
 align_within = select_clause
 align_scope = bracketed
+
+
+[sqlfluff:rules:references.keywords]
+# Natural calendar column names in dim_date; valid in Databricks SQL.
+ignore_words = year,quarter,month

@@ -13,19 +13,19 @@
 
 with source as (
 
-    select *
-    from {{ ref('int_ads__ad_stats_unioned') }}
+    select unioned.*
+    from {{ ref('int_ads__ad_stats_unioned') }} as unioned
 
     {% if is_incremental() %}
-    -- Reprocess the last N days relative to what is already loaded.
-    -- coalesce guards the edge case of an existing but empty table.
-    WHERE ad_date >= (
-        SELECT date_sub (
-            coalesce(max(ad_date), CAST('1900-01-01' AS DATE)),
-            {{ var('lookback_days', 3) }}
+        -- Reprocess the last N days relative to what is already loaded.
+        -- coalesce guards the edge case of an existing but empty table.
+        WHERE ad_date >= (
+            SELECT date_sub (
+                coalesce(max(ad_date), CAST('1900-01-01' AS DATE)),
+                {{ var('lookback_days', 3) }}
+            )
+            FROM {{ this }} AS existing
         )
-        FROM {{ this }}
-    )
     {% endif %}
 
 ),
