@@ -1,0 +1,31 @@
+# PR closed: clean up its schemas
+
+name: CI teardown
+
+on:
+  pull_request:
+    types: [closed]          # merged OR closed without merging
+
+env:
+  DBT_PROJECT_DIR: dbt
+  DBT_PROFILES_DIR: dbt
+  DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+  DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
+  DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+  DBT_CI_CATALOG: marketing_data
+  DBT_CI_SCHEMA: ci_pr_${{ github.event.pull_request.number }}
+
+jobs:
+  drop-schemas:
+    name: Drop PR schemas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run dbt deps
+      - name: Drop ci_pr_<n> and ci_pr_<n>_* schemas
+        run: >
+          uv run dbt run-operation drop_ci_schemas
+          --args '{schema_name: ${{ env.DBT_CI_SCHEMA }}}'
+          --target ci

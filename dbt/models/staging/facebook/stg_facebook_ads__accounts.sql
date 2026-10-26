@@ -1,23 +1,23 @@
 -- Path: /dbt/models/staging/facebook/stg_facebook_ads__accounts.sql
 -- Grain: one row per account_id.
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT * FROM {{ source('facebook_ads', 'accounts') }}
+    select * from {{ source('facebook_ads', 'accounts') }}
 
 ),
 
-formatted AS (
+formatted as (
     -- Formatting columns
-    SELECT
-        CAST(account_id AS STRING)              AS account_id,
-        CAST(account_name AS STRING)            AS account_name,
-        
-        CAST(ad_currency_code AS STRING)        AS ad_currency_code,
-        
-        CAST(account_created_at AS TIMESTAMP)   AS account_created_at,
-        CAST(account_updated_at AS TIMESTAMP)   AS account_updated_at
-    FROM source_data
+    select
+        cast(account_id as string)            as account_id,
+        cast(account_name as string)          as account_name,
+
+        cast(ad_currency_code as string)      as ad_currency_code,
+
+        cast(account_created_at as timestamp) as account_created_at,
+        cast(account_updated_at as timestamp) as account_updated_at
+    from source_data
 )
 
-SELECT * FROM formatted
+select * from formatted

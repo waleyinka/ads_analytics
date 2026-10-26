@@ -1,40 +1,40 @@
 -- Path: /dbt/models/staging/snapchat/stg_snapchat_ads__ad_stats.sql
 -- Grain: one row per ad_id, ad_date and country_code.
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT * FROM {{ source('snapchat_ads', 'ad_stats') }}
+    select * from {{ source('snapchat_ads', 'ad_stats') }}
 
 ),
 
-formatted AS (
+formatted as (
     -- Formatting columns
-    SELECT
-        CAST(ad_detail_id AS STRING)                        AS ad_id,
-        CAST(ad_date AS DATE)                               AS ad_date,
-        CAST(ad_country AS STRING)                          AS country_code,
-        CAST(ad_currency_code AS STRING)                    AS currency_code,
-        
-        CAST(ad_spend AS DECIMAL(18, 6))                    AS spend,
+    select
+        cast(ad_detail_id as string)              as ad_id,
+        cast(ad_date as date)                     as ad_date,
+        cast(ad_country as string)                as country_code,
+        cast(ad_currency_code as string)          as currency_code,
 
-        CAST(ad_impressions AS BIGINT)                      AS impressions,
-        
-        CAST(NULLIF(ad_clicks, 'null') AS BIGINT)           AS clicks_raw
-    FROM source_data
+        cast(ad_spend as decimal(18, 6))          as spend,
+
+        cast(ad_impressions as bigint)            as impressions,
+
+        cast(nullif(ad_clicks, 'null') as bigint) as clicks_raw
+    from source_data
 ),
 
-cleaned AS (
-    SELECT
-        'snapchat'                  AS platform,
+cleaned as (
+    select
+        'snapchat'              as platform,
         ad_id,
         ad_date,
         country_code,
         currency_code,
         spend,
         impressions,
-        COALESCE(clicks_raw, 0)     AS clicks,
-        clicks_raw IS NOT NULL      AS is_clicks_reported
-    FROM formatted
+        coalesce(clicks_raw, 0) as clicks,
+        clicks_raw is not null  as is_clicks_reported
+    from formatted
 )
 
-SELECT * FROM cleaned
+select * from cleaned

@@ -1,35 +1,37 @@
 -- Grain: one row per platform and campaign.
 
-WITH campaigns AS (
+with campaigns as (
 
-    SELECT * FROM {{ ref('int_ads__campaigns_unioned') }}
-
-),
-
-facebook_accounts AS (
-
-    SELECT account_id, account_name
-    FROM {{ ref('stg_facebook_ads__accounts') }}
+    select * from {{ ref('int_ads__campaigns_unioned') }}
 
 ),
 
-spend_summary AS (
+facebook_accounts as (
 
-    SELECT
+    select
+        account_id,
+        account_name
+    from {{ ref('stg_facebook_ads__accounts') }}
+
+),
+
+spend_summary as (
+
+    select
         platform,
         campaign_id,
-        min(ad_date)                                 AS first_spend_date,
-        max(ad_date)                                 AS last_spend_date
-    FROM {{ ref('int_ads__ad_stats_unioned') }}
-    WHERE spend > 0
-    GROUP BY platform, campaign_id
+        min(ad_date) as first_spend_date,
+        max(ad_date) as last_spend_date
+    from {{ ref('int_ads__ad_stats_unioned') }}
+    where spend > 0
+    group by platform, campaign_id
 
 ),
 
-final AS (
+final as (
 
-    SELECT
-        {{ dbt_utils.generate_surrogate_key(['c.platform', 'c.campaign_id']) }} AS campaign_key,
+    select
+        {{ dbt_utils.generate_surrogate_key(['c.platform', 'c.campaign_id']) }} as campaign_key,
         c.platform,
         c.campaign_id,
         c.campaign_name,
@@ -38,15 +40,17 @@ final AS (
         f.account_name,
         ss.first_spend_date,
         ss.last_spend_date,
-        ss.campaign_id IS NOT NULL        AS has_spend
-    FROM campaigns c
-    LEFT JOIN facebook_accounts f
-        ON c.platform = 'facebook'
-       AND c.account_id = f.account_id
-    LEFT JOIN spend_summary ss
-        ON c.platform = ss.platform
-       AND c.campaign_id = ss.campaign_id
+        ss.campaign_id is not null                                              as has_spend
+    from campaigns as c
+    left join facebook_accounts as f
+        on
+            c.platform = 'facebook'
+            and c.account_id = f.account_id
+    left join spend_summary as ss
+        on
+            c.platform = ss.platform
+            and c.campaign_id = ss.campaign_id
 
 )
 
-SELECT * FROM final
+select * from final

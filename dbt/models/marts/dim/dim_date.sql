@@ -1,7 +1,7 @@
 -- Grain: one row per calendar day, covering both platforms' data (2024-2025).
 -- Lets analysts and AI agents answer "last month" or "by week" consistently.
 
-WITH spine AS (
+with spine as (
 
     {{ dbt_utils.date_spine(
         datepart="day",
@@ -11,18 +11,18 @@ WITH spine AS (
 
 ),
 
-final AS (
+final as (
 
-    SELECT
-        CAST(date_day AS date)                       AS date_day,
-        year(date_day)                               AS year,
-        quarter(date_day)                            AS quarter,
-        month(date_day)                              AS month,
-        date_format(date_day, 'MMMM')                AS month_name,
-        CAST(date_trunc('month', date_day) AS date)  AS month_start,
-        CAST(date_trunc('week', date_day) AS date)   AS week_start,     -- Monday
-        dayofweek(date_day) IN (1, 7)                AS is_weekend      -- 1 = Sunday
-    FROM spine
+    select
+        cast(date_day as date)                      as date_day,
+        year(date_day)                              as year,
+        quarter(date_day)                           as quarter,
+        month(date_day)                             as month,
+        date_format(date_day, 'MMMM')               as month_name,
+        cast(date_trunc('month', date_day) as date) as month_start,
+        cast(date_trunc('week', date_day) as date)  as week_start,     -- Monday
+        dayofweek(date_day) in (1, 7)               as is_weekend      -- 1 = Sunday
+    from spine
 )
 
-SELECT * FROM final
+select * from final

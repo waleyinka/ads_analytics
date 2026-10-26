@@ -2,55 +2,57 @@
 -- Job: combine both platforms' campaigns into one shape for dim_campaign.
 -- Expected rows: 4,162 (Facebook) + 109 (Snapchat) = 4,271.
 
-WITH facebook_campaigns AS (
+with facebook_campaigns as (
 
-    SELECT
+    select
         campaign_id,
         campaign_name
-    FROM {{ ref('stg_facebook_ads__campaigns') }}
+    from {{ ref('stg_facebook_ads__campaigns') }}
 
 ),
 
 -- Facebook campaigns have no account_id column, so derived from ads.
-facebook_campaign_accounts AS (
-    SELECT DISTINCT campaign_id, account_id
-    FROM {{ ref('stg_facebook_ads__ads') }}
+facebook_campaign_accounts as (
+    select distinct
+        campaign_id,
+        account_id
+    from {{ ref('stg_facebook_ads__ads') }}
 ),
 
-facebook AS (
-    SELECT
-        'facebook'                                   AS platform,
+facebook as (
+    select
+        'facebook' as platform,
         fc.campaign_id,
         fc.campaign_name,
         fca.account_id
-    FROM facebook_campaigns fc
-    LEFT JOIN facebook_campaign_accounts fca
-        ON fc.campaign_id = fca.campaign_id
+    from facebook_campaigns as fc
+    left join facebook_campaign_accounts as fca
+        on fc.campaign_id = fca.campaign_id
 ),
 
-snapchat AS (
-    SELECT
-        'snapchat'                                   AS platform,
+snapchat as (
+    select
+        'snapchat' as platform,
         campaign_id,
         campaign_name,
         account_id
-    FROM {{ ref('stg_snapchat_ads__campaigns') }}
+    from {{ ref('stg_snapchat_ads__campaigns') }}
 ),
 
-unioned AS (
-    SELECT
+unioned as (
+    select
         platform,
         campaign_id,
         campaign_name,
         account_id
-    FROM facebook
-    UNION ALL
-    SELECT
+    from facebook
+    union all
+    select
         platform,
         campaign_id,
         campaign_name,
         account_id
-    FROM snapchat
+    from snapchat
 )
 
-SELECT * FROM unioned
+select * from unioned

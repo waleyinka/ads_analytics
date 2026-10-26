@@ -1,0 +1,36 @@
+[sqlfluff]
+templater = dbt
+dialect = databricks
+max_line_length = 120
+# ST06: column order in SELECT is a style choice, not a correctness issue.
+exclude_rules = ST06
+
+[sqlfluff:templater:dbt]
+project_dir = dbt
+profiles_dir = dbt
+profile = ads_analytics
+target = ci
+
+# Lowercase everything: the dbt style guide convention.
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = lower
+
+# Keep "AS" aliases aligned in a column.
+[sqlfluff:layout:type:alias_expression]
+spacing_before = align
+align_within = select_clause
+align_scope = bracketed
+
+
+[sqlfluff:rules:references.keywords]
+# Natural calendar column names in dim_date; valid in Databricks SQL.
+ignore_words = year,quarter,month
